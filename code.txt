@@ -1,0 +1,108 @@
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, json
+import psycopg2
+from datetime import datetime
+import joblib
+import numpy as np
+import pandas as pd
+import os
+import warnings
+import plotly.express as px
+import plotly.io as pio
+from folium.plugins import HeatMap
+import folium
+warnings.filterwarnings("ignore")
+app = Flask( name )
+app.secret_key = 'climate'
+basemap = folium.Map()
+def connect_to_db():
+return psycopg2.connect(
+user="postgres",
+host="localhost",
+port=5432,
+database="climate"
+)
+conn = connect_to_db()
+cursor = conn.cursor()
+@app.route('/')
+def login():
+return render_template("auth.html")
+('/add_users', methods=['POST'])
+def add_users():
+name = request.form.get('username')
+email=request.form.get('email')
+password=request.form.get('password')
+cursor.execute("""
+INSERT INTO login(name, email, password)
+VALUES(%s,%s,%s)
+""",(name,email,password))
+conn.commit()
+session[('user_id')]= cursor.lastrowid
+session['user_name']=name
+session['user_email']=email
+return render_template("successful.html")
+('/login_validation', methods=['POST'])
+def login_validation():
+email = request.form.get('username')
+password = request.form.get('password')
+cursor.execute("SELECT user_id, name, email FROM login WHERE email = %s AND password = %s", (email, password))
+user = cursor.fetchone()
+print(user)
+if user:
+session['user_id'] = user[0]
+session['user_name'] = user[1]
+session['user_email'] = user[2]
+return redirect('/starter')
+else:
+flash('Invalid email or password', 'danger')
+return redirect('/')
+def starter():
+name = session.get('user_name')
+if name:
+return render_template("index.html", name=name)
+else:
+flash('Please log in first.', 'warning')
+return redirect('/')
+models_base_dir = os.path.join(os.path.dirname( file ), 'models')
+ndia_models_dir = os.path.join(models_base_dir, 'india')
+india_models = {
+"regression_model": joblib.load(os.path.join(india_models_dir, 'weather_regression_model.pkl')),
+"classification_model": joblib.load(os.path.join(india_models_dir, 'weather_classification_model.pkl')),
+"location_encoder": joblib.load(os.path.join(india_models_dir, 'location_encoder.pkl')),
+"weather_encoder": joblib.load(os.path.join(india_models_dir, 'weather_encoder.pkl'))
+}
+def login():
+return render_template("auth.html")
+@app.route('/add_users', methods=['POST'])
+def add_users():
+name = request.form.get('username')
+email = request.form.get('email')
+password = request.form.get('password')
+cursor.execute("INSERT INTO login(name, email, password) VALUES(%s,%s,%s)", (name, email, password))
+conn.commit()
+session['user_name'] = name
+return render_template("successful.html")
+def predict():
+location = request.form['location']
+date = request.form['date']
+try:
+location_encoded = india_models["location_encoder"].transform([location])[0]
+year, month = pd.to_datetime(date).year, pd.to_datetime(date).month
+input_data = np.array([[location_encoded, year, month]])
+reg_pred = india_models["regression_model"].predict(input_data)[0]
+class_pred = india_models["classification_model"].predict(input_data)
+result = {
+"Temperature": round(reg_pred[0], 2),
+"Humidity": round(reg_pred[1], 2),
+"Precipitation": round(reg_pred[2], 2),
+"Wind Speed": round(reg_pred[3], 2),
+"Weather Forecast": india_models["weather_encoder"].inverse_transform(class_pred)[0]
+}
+return render_template('index.html', result=result, countries=world_models["label_encoder"].classes_)
+except Exception as e:
+flash(f"Error: {e}", "danger")
+return redirect(url_for('starter'))
+("/logout")
+def logout():
+return redirect("/")
+if name == ' main ':
+app.run(debug=True)
